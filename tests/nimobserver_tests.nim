@@ -4,10 +4,10 @@ import deques
 import sequtils
 
 type
-    Envelope = object
+    Message = object
         data: string
         `type`: string
-    EnvelopeRef* = ref Envelope
+    MessageRef* = ref Message
 
     Event* = enum
         EVENT_TEST_STARTED
@@ -25,31 +25,43 @@ type
     Subject* = ref object of RootObj
         observers: seq[Observer]
         observerCount: int
+        events: Deque[(MessageRef, Event)]
 
     RTMMessages* = ref object of Subject
 
-method onNotify(observer: Observer, envelope: EnvelopeRef, event: Event) {.base.} = 
+method onNotify(observer: Observer, message: MessageRef, event: Event) {.base.} = 
     echo "On Base Notification!"
+    echo "Data value: " & message.data
 
-method onNotify(observer: TestObserver, envelope: EnvelopeRef, event: Event) = 
+method onNotify(observer: TestObserver, message: MessageRef, event: Event) = 
     echo "On Test Notification!"
     observer.inTesting = not observer.inTesting
+    echo "Data value: " & message.data
 
-method onNotify(observer: OtherTestObserver, envelope: EnvelopeRef, event: Event) = 
+method onNotify(observer: OtherTestObserver, message: MessageRef, event: Event) = 
     echo "On OtherTest Notification!"
     observer.testStatus = "Stopped!"
+    echo "Data value: " & message.data
 
-method notify(subject: var Subject, envelope: EnvelopeRef, event: Event) {.base.} =
-    for obs in subject.observers:
-        obs.onNotify(envelope, event)
+method notify(subject: var Subject, notification: (MessageRef, Event)) {.base.} =
+    for observer in subject.observers:
+        observer.onNotify(notification[0], notification[1])
 
-method updateEnvelope(subject: var Subject, envelope: EnvelopeRef) {.base.} =
-    subject.notify(envelope, EVENT_TEST_STARTED)
+method update(subject: var Subject) {.base.} =
+    while subject.events.len > 0:
+        subject.notify(subject.events.popFirst())
+
+method publish(subject: var Subject, message: MessageRef, event: Event) {.base.} =
+    #[
+    Add our events to the end of the queue, to be popped off the head when processed
+    ]#
+    subject.events.addLast((message, event))
 
 proc newSubject(): Subject =
     result = new Subject
     result.observers = @[]
     result.observerCount = 0
+    result.events = initDeque[(MessageRef, Event)]()
 
 method addObserver(subject: var Subject, observer: Observer) {.base.} =
     subject.observers.add(observer)
@@ -76,7 +88,7 @@ suite "MessageBusTests":
             baseObs = BaseTestObserver()
 
         let
-            env = EnvelopeRef(data: "test", type: "TestMessage")
+            msg = MessageRef(data: "test", type: "TestMessage")
 
         sub.addObserver(obs)
 
@@ -92,7 +104,14 @@ suite "MessageBusTests":
         sub.addObserver(baseObs)
 
         #Should get an echo from TestObserver, OtherTestObserver and a base notification from BaseTestObserver, where onNotify is not implemented
-        sub.updateEnvelope(env)
+        sub.publish(msg, EVENT_TEST_STARTED)
+        
+        check sub.events.len == 1
+        check sub.events.peekFirst()[0].data == "test"
+
+        sub.update()
+
+        check sub.events.len == 0
 
         check obs.inTesting
 
