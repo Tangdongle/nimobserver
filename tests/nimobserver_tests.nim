@@ -1,8 +1,9 @@
 import unittest
 import asyncdispatch
-import deques
-import sequtils
-import threadpool
+import os
+import sequtils, strutils
+import threadpool, locks
+import nimobserver/message
 
 type
     Message = object
@@ -13,55 +14,69 @@ type
     Event* = enum
         EVENT_TEST_STARTED
 
-    Observer = ref object of RootObj
+    BaseObserver = ref object of RootObj
 
-    BaseTestObserver* = ref object of Observer
+    BaseTestObserver* = ref object of BaseObserver
 
-    OtherTestObserver* = ref object of Observer
+    OtherTestObserver* = ref object of BaseObserver
         testStatus: string
 
-    TestObserver* = ref object of Observer
+    TestObserver* = ref object of BaseObserver
         inTesting: bool
 
     Subject* = ref object of RootObj
-        observers: seq[Observer]
-        observerCount: int
-        events: Deque[(MessageRef, Event)]
+        observers: seq[BaseObserver]
+        channel: Channel[BaseMessage]
 
-method onNotify(observer: Observer, message: MessageRef, event: Event) {.base.} = 
-    echo "Base Notification:: Data value: " & message.data
+method onNotify(observer: BaseObserver, message: BaseMessage) {.base gcsafe.} = 
+    echo "Base Notification:: Data value: " & $message
 
-method onNotify(observer: TestObserver, message: MessageRef, event: Event) = 
+method onNotify(observer: TestObserver, message: BaseMessage) = 
     observer.inTesting = not observer.inTesting
     echo "Changing testing"
 
-method onNotify(observer: OtherTestObserver, message: MessageRef, event: Event) = 
+method onNotify(observer: OtherTestObserver, message: BaseMessage) = 
     observer.testStatus = "Stopped!"
 
-method notify(subject: var Subject, notification: (MessageRef, Event)) {.base.} =
+method notify(subject: Subject, notification: BaseMessage) {.base gcsafe.} =
     for observer in subject.observers:
-        echo "Spawning thread"
-        observer.onNotify(notification[0], notification[1])
+        echo "Calling notify"
+        observer.onNotify(notification)
 
-method update(subject: var Subject) {.base.} =
-    while subject.events.len > 0:
-        subject.notify(subject.events.popFirst())
+method update(subject: Subject, runForever: bool = true) {.base thread.} =
+    while true:
+        echo "Checking for messages"
+        let (dataReady, msg) = tryRecv(subject.channel)
+        if dataReady:
+            subject.notify(msg)
+            if not runForever:
+                return
+        else:
+            echo "Sleeping"
+            sleep(300)
 
-method publish(subject: var Subject, message: MessageRef, event: Event) {.base.} =
+method publish(subject: var Subject, message: SlackMessage) {.base.} =
     #[
     Add our events to the end of the queue, to be popped off the head when processed
     ]#
-    subject.events.addLast((message, event))
+    subject.channel.send message
 
 proc newSubject(): Subject =
     result = new Subject
     result.observers = @[]
-    result.events = initDeque[(MessageRef, Event)]()
+    open(result.channel)
+    spawn result.update()
 
-method addObserver(subject: var Subject, observer: Observer) {.base.} =
+proc newTestSubject(): Subject =
+    result = new Subject
+    result.observers = @[]
+    open(result.channel)
+    spawn result.update(false)
+
+method addObserver(subject: var Subject, observer: BaseObserver) {.base.} =
     subject.observers.add(observer)
 
-method removeObserver(subject: var Subject, observer: Observer) {.base.} =
+method removeObserver(subject: var Subject, observer: BaseObserver) {.base.} =
     assert subject.observers.contains(observer)
     subject.observers.delete(subject.observers.find(observer))
 
@@ -75,13 +90,13 @@ suite "MessageBusTests":
 
     test "SubjectTest":
         var 
-            sub = newSubject()
+            sub = newTestSubject()
             obs = TestObserver(inTesting: false)
             otherObs = OtherTestObserver(testStatus: "Running")
             baseObs = BaseTestObserver()
 
         let
-            msg = MessageRef(data: "test", type: "TestMessage")
+            msg = newSlackMessage("message", "TestUser", "TestMessageText", "TestSendingUser")
 
         sub.addObserver(obs)
 
@@ -94,24 +109,30 @@ suite "MessageBusTests":
 
         sub.addObserver(baseObs)
 
+        echo "Publishing message"
         #Should get an echo from TestObserver, OtherTestObserver and a base notification from BaseTestObserver, where onNotify is not implemented
-        sub.publish(msg, EVENT_TEST_STARTED)
+        sub.publish(msg)
+        echo sub.channel.peek()
+        sync()
         
-        check sub.events.len == 1
-        check sub.events.peekFirst()[0].data == "test"
-
-        sub.update()
-
-        check sub.events.len == 0
-
-        check obs.inTesting
-
         sub.removeObserver(obs)
 
         check (not sub.observers.contains obs)
 
+    test "ChannelTests":
 
+        var counterLock: Lock
+        initLock(counterLock)
+        var counter {.guard: counterLock.} = 0
+            
+        proc channelTestProc(x: int) =
+            for i in 0 ..< x:
+                withLock counterLock:
+                    var value = counter
+                    value.inc
+                    counter = value
 
-
-
-
+        spawn channelTestProc(10_000)
+        spawn channelTestProc(10_000)
+        sync()
+        echo(counter)
