@@ -72,6 +72,7 @@ rtmtypes SlackRTMType:
     IMCreated = "im_created"
     IMOpen = "im_open"
     Error = "error"
+    Test = "test"
 
 type
     BaseMessage* = object of RootObj
@@ -136,8 +137,9 @@ proc `%*`*(message: SlackMessage): JsonNode =
     ]#
     result = newJObject()
     result.add("type", newJString($message.type))
-    result.add("channel", newJString($message.channel))
-    result.add("message", newJString($message.text))
+    result.add("channel", newJString(message.channel))
+    result.add("message", newJString(message.text))
+    result.add("user", newJString(message.user))
 
 proc `$`*(message: SlackMessage): string =
     $(%*message)
