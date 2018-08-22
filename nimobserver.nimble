@@ -12,4 +12,4 @@ requires "nim >= 0.18.0"
 
 task test, "Run the tests":
     exec("mkdir -p tests/bin")
-    exec("nim c -r --out:tests/bin/nimobserver_tests tests/nimobserver_tests")
+    exec("nim c -r --threads:on --gc:boehm --out:tests/bin/nimobserver_tests tests/nimobserver_tests")

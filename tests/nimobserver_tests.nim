@@ -2,6 +2,7 @@ import unittest
 import asyncdispatch
 import deques
 import sequtils
+import threadpool
 
 type
     Message = object
@@ -27,24 +28,19 @@ type
         observerCount: int
         events: Deque[(MessageRef, Event)]
 
-    RTMMessages* = ref object of Subject
-
 method onNotify(observer: Observer, message: MessageRef, event: Event) {.base.} = 
-    echo "On Base Notification!"
-    echo "Data value: " & message.data
+    echo "Base Notification:: Data value: " & message.data
 
 method onNotify(observer: TestObserver, message: MessageRef, event: Event) = 
-    echo "On Test Notification!"
     observer.inTesting = not observer.inTesting
-    echo "Data value: " & message.data
+    echo "Changing testing"
 
 method onNotify(observer: OtherTestObserver, message: MessageRef, event: Event) = 
-    echo "On OtherTest Notification!"
     observer.testStatus = "Stopped!"
-    echo "Data value: " & message.data
 
 method notify(subject: var Subject, notification: (MessageRef, Event)) {.base.} =
     for observer in subject.observers:
+        echo "Spawning thread"
         observer.onNotify(notification[0], notification[1])
 
 method update(subject: var Subject) {.base.} =
@@ -60,17 +56,14 @@ method publish(subject: var Subject, message: MessageRef, event: Event) {.base.}
 proc newSubject(): Subject =
     result = new Subject
     result.observers = @[]
-    result.observerCount = 0
     result.events = initDeque[(MessageRef, Event)]()
 
 method addObserver(subject: var Subject, observer: Observer) {.base.} =
     subject.observers.add(observer)
-    inc subject.observerCount
 
 method removeObserver(subject: var Subject, observer: Observer) {.base.} =
-    assert subject.observers.contains(observer) and subject.observerCount > 0
+    assert subject.observers.contains(observer)
     subject.observers.delete(subject.observers.find(observer))
-    dec subject.observerCount
 
 suite "MessageBusTests":
 
@@ -92,12 +85,10 @@ suite "MessageBusTests":
 
         sub.addObserver(obs)
 
-        check sub.observerCount == 1
         check sub.observers.contains obs
 
         sub.addObserver(otherObs)
 
-        check sub.observerCount == 2
         check sub.observers.contains otherObs
         check sub.observers.contains obs
 
@@ -117,7 +108,6 @@ suite "MessageBusTests":
 
         sub.removeObserver(obs)
 
-        check sub.observerCount == 2
         check (not sub.observers.contains obs)
 
 
