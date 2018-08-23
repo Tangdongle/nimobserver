@@ -1,7 +1,9 @@
 Example	nimobserver.html#example	 Example	
 BaseObserver	nimobserver.html#BaseObserver	nimobserver : BaseObserver	
+BaseMessage	nimobserver.html#BaseMessage	nimobserver : BaseMessage	
 Subject	nimobserver.html#Subject	nimobserver : Subject	
 SubjectPtr	nimobserver.html#SubjectPtr	nimobserver : SubjectPtr	
+onNotify	nimobserver.html#onNotify.e,BaseObserver,ptr.BaseMessage	nimobserver : onNotify(observer: BaseObserver; message: ptr BaseMessage)	
 publish	nimobserver.html#publish.e,SubjectPtr[T],T	nimobserver : publish[T](subject: SubjectPtr[T]; message: T)	
 addObserver	nimobserver.html#addObserver.e,SubjectPtr[T],BaseObserver	nimobserver : addObserver[T](subject: SubjectPtr[T]; observer: BaseObserver)	
 removeObserver	nimobserver.html#removeObserver.e,SubjectPtr[T],BaseObserver	nimobserver : removeObserver[T](subject: SubjectPtr[T]; observer: BaseObserver)	
