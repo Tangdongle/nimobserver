@@ -21,6 +21,7 @@
 
 from threadpool import spawn
 from os import sleep
+from sequtils import delete
 from typetraits import name
 
 type
@@ -39,7 +40,7 @@ type
 
 method onNotify*(observer: BaseObserver, message: ptr BaseMessage) {.base gcsafe.} = 
   ## Base method for observers to implement. Observers are notified when a message is received
-  echo "Base Notification:: Data value: " 
+  echo "Base Notification:: Data value: " & repr(message) 
 
 method notify[T](subject: SubjectPtr[T], notification: ptr BaseMessage) {.base gcsafe.} =
   ## Base notify method. Alerts all observers when a message is processed
@@ -78,6 +79,8 @@ proc initSubject*[T](): SubjectPtr[T] =
 
 proc destroySubject*[T](subject: SubjectPtr[T]) =
   ## Deallocate shared memory
+  close(subject.channel)
+  subject.observers.delete(subject.observers.low, subject.observers.high)
   deallocShared(subject)
 
 proc `$`*(x: BaseObserver): string =

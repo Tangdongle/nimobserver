@@ -25,12 +25,16 @@ proc `$`(x: TestMessagePtr): string =
 
 method onNotify*(observer: TestObserver, message: TestMessagePtr) =
   check(not isNil(message))
+  check(message.message == "test")
   echo "Notified of message: " & $message
 
 suite "NimObserverTests":
 
   setup:
     let globalTestSub = initSubject[TestMessagePtr]()
+
+  teardown:
+    destroySubject(globalTestSub)
 
   test "GlobalSubjectChannelTests":
 
