@@ -1,0 +1,12 @@
+Example	nimobserver.html#example	 Example	
+BaseObserver	nimobserver.html#BaseObserver	nimobserver : BaseObserver	
+Subject	nimobserver.html#Subject	nimobserver : Subject	
+SubjectPtr	nimobserver.html#SubjectPtr	nimobserver : SubjectPtr	
+publish	nimobserver.html#publish.e,SubjectPtr[T],T	nimobserver : publish[T](subject: SubjectPtr[T]; message: T)	
+addObserver	nimobserver.html#addObserver.e,SubjectPtr[T],BaseObserver	nimobserver : addObserver[T](subject: SubjectPtr[T]; observer: BaseObserver)	
+removeObserver	nimobserver.html#removeObserver.e,SubjectPtr[T],BaseObserver	nimobserver : removeObserver[T](subject: SubjectPtr[T]; observer: BaseObserver)	
+newSubject	nimobserver.html#newSubject,	nimobserver : newSubject[T](): SubjectPtr[T]	
+initSubject	nimobserver.html#initSubject,	nimobserver : initSubject[T](): SubjectPtr[T]	
+destroySubject	nimobserver.html#destroySubject,SubjectPtr[T]	nimobserver : destroySubject[T](subject: SubjectPtr[T])	
+`$`	nimobserver.html#$,BaseObserver	nimobserver : `$`(x: BaseObserver): string	
+`$`	nimobserver.html#$,SubjectPtr[T]	nimobserver : `$`[T](x: SubjectPtr[T]): string	

@@ -1,36 +1,54 @@
 import unittest
-import asyncdispatch
-import os
 import sequtils, strutils
+from os import sleep
 import nimobserver
-import nimobserver/message
 from threadpool import spawn
 
-suite "MessageBusTests":
-  type
-    TestObserver = ref object of BaseObserver
-      inTesting: bool
+type
+  TestObserver {.final.} = ref object of BaseObserver
+    inTesting: bool
+
+  TestMessage = ref object of BaseMessage
+    message: string
+
+  TestMessagePtr = ptr TestMessage
+  
+proc newTestMessage(message: string): TestMessage =
+  result = new TestMessage
+  result.message = message
+
+proc `$`(x: TestMessage): string =
+  x.message
+
+proc `$`(x: TestMessagePtr): string =
+  $x[]
+
+method onNotify*(observer: TestObserver, message: TestMessagePtr) =
+  check(not isNil(message))
+  echo "Notified of message: " & $message
+
+suite "NimObserverTests":
 
   setup:
-    echo "Setup"
-    let globalTestSub = initSubject[SlackMessagePtr]()
+    let globalTestSub = initSubject[TestMessagePtr]()
 
-  test "ChannelTests":
+  test "GlobalSubjectChannelTests":
 
-    var 
-      obs = TestObserver(inTesting: false)
-      obs2 = TestObserver(inTesting: false)
-      newMsg = newSlackMessage("test", "TestUser", "TestMessageText", "TestSendingUser")
+    let
+      obs = BaseObserver()
+      obs2 = TestObserver(inTesting: true)
 
-    proc updateGlobalSubject(sMsg: SlackMessagePtr) {.thread.} =
+    var
+      newMsg = newTestMessage("test")
+
+    proc updateGlobalSubject(sMsg: TestMessagePtr) {.thread.} =
       {.gcsafe.}:
         globalTestSub.publish sMsg
 
     globalTestSub.addObserver(obs)
     globalTestSub.addObserver(obs2)
-    echo "Spawning two globalSubjects!"
+
     spawn updateGlobalSubject(addr newMsg)
 
-    echo "Sleeping in main"
     sleep(3000)
     spawn updateGlobalSubject(addr newMsg)
