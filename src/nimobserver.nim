@@ -1,6 +1,15 @@
 # messagebus
-# Copyright Ryanc_signiq
+# Copyright Tangdongle
 # A message event queue implementation
+#
+#To start listening, init a Subject object to return a pointer to a Subject on the shared heap
+#so that all published messages are handled on other threads
+#
+#Must be compiled with --threads:on for channels and threads
+#
+#let globalTestSub: SubjectPtr[MessagePtr] = initSubject[MessagePtr]()
+#
+
 from threadpool import spawn
 from os import sleep
 from typetraits import name
@@ -15,18 +24,25 @@ type
   SubjectPtr*[T] = ptr Subject[T]
 
 method onNotify[T](observer: BaseObserver, message: T) {.base gcsafe.} = 
-  echo "Base Notification:: Data value: " & $message
+  #[
+  Base method for observers to implement. Observers are notified when a message is received
+  ]#
+  echo "Base Notification:: Data value: " & $message[]
 
 method notify[T](subject: SubjectPtr[T], notification: T) {.base gcsafe.} =
+  #[
+  Base notify method. Alerts all observers when a message is processed
+  ]#
   for observer in subject.observers:
-    observer.onNotify(notification[])
+    observer.onNotify(notification)
 
 method update[T](subject: SubjectPtr[T]) {.base thread.} =
+  #[
+  Background watcher. Blocks until a message is published on the subject's channel
+  ]#
   while true:
     let msg = recv(subject.channel)
     subject.notify(msg)
-    echo "Sleeping"
-    sleep(300)
 
 method publish*[T](subject: SubjectPtr[T], message: T) {.base.} =
   #[
@@ -35,9 +51,15 @@ method publish*[T](subject: SubjectPtr[T], message: T) {.base.} =
   subject.channel.send message
 
 method addObserver*[T](subject: SubjectPtr[T], observer: BaseObserver) {.base.} =
+  #[
+  Add an Observer to be notified on a message being received
+  ]#
   subject.observers.add(observer)
 
 method removeObserver*[T](subject: SubjectPtr[T], observer: BaseObserver) {.base.} =
+  #[
+  Remove an Observer, causing it to no longer be notified when a message is published
+  ]#
   assert subject.observers.contains(observer)
   subject.observers.delete(subject.observers.find(observer))
 
@@ -55,7 +77,4 @@ proc `$`*(x: BaseObserver): string =
 
 proc `$`*[T](x: SubjectPtr[T]): string =
   result = $x.observers
-
-#let globalTestSub: SubjectPtr[SlackMessagePtr] = newSubject[SlackMessagePtr]()
-#spawn globalTestSub.update()
 
